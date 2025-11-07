@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AttendanceFlow Pro - Admin Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#4f46e5',
+            secondary: '#7c3aed',
+            accent: '#06b6d4',
+            success: '#10b981',
+            warning: '#f59e0b',
+            danger: '#ef4444',
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    .glass-card { backdrop-filter: blur(12px); background: rgba(255, 255, 255, 0.95); border: 1px solid rgba(255, 255, 255, 0.3); }
+    .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); }
+    .tab-active { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; }
+    .stat-card { background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(124, 58, 237, 0.1)); border: 1px solid rgba(79, 70, 229, 0.2); }
+    .notification { position: fixed; top: 20px; right: 20px; z-index: 1000; padding: 12px 24px; border-radius: 8px; color: white; font-weight: 600; transform: translateX(400px); transition: transform 0.3s ease; }
+    .notification.show { transform: translateX(0); }
+    .notification.success { background: linear-gradient(135deg, #10b981, #059669); }
+    .notification.error { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .photo-placeholder { background: linear-gradient(135deg, #667eea, #764ba2); }
+
+    /* NEW Modal styles */
+    .modal { z-index: 1000; }
+    .modal-overlay { z-index: 990; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+
+  <div id="notification-container"></div>
+
+  <div class="bg-white/80 backdrop-blur-lg border-b border-gray-200/50 sticky top-0 z-50">
+    <div class="container mx-auto px-6 py-4">
+        <div class="flex items-center justify-between flex-wrap gap-4">
+            <div class="flex items-center space-x-4">
+                <div class="w-12 h-12 bg-gradient-to-r from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg">
+                    <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-black bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Admin Dashboard</h1>
+                    <p id="college-name-display" class="text-gray-600 font-medium">Loading college...</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="logout-btn" class="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
+                    <span class="font-medium">Logout</span>
+                </button>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <div class="container mx-auto px-6 py-8">
+    
+    <div class="flex space-x-1 bg-white/60 backdrop-blur-sm rounded-2xl p-2 mb-8 shadow-lg overflow-x-auto">
+      <button id="tab-dashboard" class="tab-btn px-6 py-3 rounded-xl font-semibold transition-all whitespace-nowrap" onclick="showTab('dashboard')">Dashboard</button>
+      <button id="tab-students" class="tab-btn px-6 py-3 rounded-xl font-semibold text-gray-600" onclick="showTab('students')">Students</button>
+      <button id="tab-faculty" class="tab-btn px-6 py-3 rounded-xl font-semibold text-gray-600 whitespace-nowrap" onclick="showTab('faculty')">Faculty</button>
+      <button id="tab-academics" class="tab-btn px-6 py-3 rounded-xl font-semibold text-gray-600" onclick="showTab('academics')">Academics</button>
+      <button id="tab-scheduler" class="tab-btn px-6 py-3 rounded-xl font-semibold text-gray-600" onclick="showTab('scheduler')">Scheduler</button>
+      <button id="tab-attendance" class="tab-btn px-6 py-3 rounded-xl font-semibold text-gray-600 whitespace-nowrap" onclick="showTab('attendance')">Attendance Records</button>
+      <button id="tab-settings" class="tab-btn px-6 py-3 rounded-xl font-semibold text-gray-600" onclick="showTab('settings')">Settings</button>
+    </div>
+
+   
+    <div id="content-dashboard" class="tab-content hidden">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="stat-card rounded-2xl p-6 text-center"><div class="text-3xl font-bold text-gray-800" id="metric-overall-attendance">--%</div><div class="text-sm font-medium text-gray-600 mt-1">Overall Attendance Rate</div></div>
+        <div class="stat-card rounded-2xl p-6 text-center"><div class="text-3xl font-bold text-gray-800" id="metric-today-attendance">--%</div><div class="text-sm font-medium text-gray-600 mt-1">Today's Attendance</div></div>
+        <div class="stat-card rounded-2xl p-6 text-center"><div class="text-3xl font-bold text-gray-800" id="metric-total-students">--</div><div class="text-sm font-medium text-gray-600 mt-1">Total Students</div></div>
+      </div>
+      <div class="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="glass-card rounded-3xl shadow-xl p-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-4">Attendance by Group (Last 30 Days)</h3>
+          <div class="relative h-96">
+            <canvas id="metric-class-attendance-chart"></canvas>
+          </div>
+        </div>
+        <div class="space-y-8">
+            <div class="glass-card rounded-3xl shadow-xl p-6">
+              <h3 class="text-xl font-bold text-gray-800 mb-4">Top Absentees (Last 30 Days)</h3>
+              <ul id="metric-top-absentees" class="space-y-3 max-h-48 overflow-y-auto"></ul>
+            </div>
+            <div class="glass-card rounded-3xl shadow-xl p-6">
+              <h3 class="text-xl font-bold text-gray-800 mb-4">Top Present Students (Last 30 Days)</h3>
+              <ul id="metric-top-present" class="space-y-3 max-h-48 overflow-y-auto"></ul>
+            </div>
+        </div>
+      </div>
+    </div>
+
+    
+    <div id="content-students" class="tab-content hidden">
+
+  <div class="glass-card rounded-3xl shadow-xl p-6 mb-8">
+    <h3 class="text-xl font-bold text-gray-800 mb-4">Bulk Student Upload</h3>
+    <p class="text-sm text-gray-600 mb-4">
+      Upload an Excel file (.xlsx) with student data. Make sure the columns match the template:
+      <code class="text-xs bg-gray-100 p-1 rounded">Name</code>,
+      <code class="text-xs bg-gray-100 p-1 rounded">Roll_Number</code>,
+      <code class="text-xs bg-gray-100 p-1 rounded">Parent_Phone</code>,
+      <code class="text-xs bg-gray-100 p-1 rounded">Class</code>,
+      <code class="text-xs bg-gray-100 p-1 rounded">Section</code>,
+      <code class="text-xs bg-gray-100 p-1 rounded">Image_URL</code>.
+    </p>
+
+    <div class="note bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-sm mb-4">
+      <strong>Important:</strong> The <code>Image_URL</code> must be a direct, public link to a JPG or PNG file. Google Drive links will not work unless they are direct download links.
+    </div>
+
+    <div class="flex items-center space-x-4">
+      <input type="file" id="student-excel-file" accept=".xlsx, .xls" class="block w-full text-sm text-gray-500
+        file:mr-4 file:py-2 file:px-4
+        file:rounded-xl file:border-0
+        file:text-sm file:font-semibold
+        file:bg-indigo-50 file:text-primary
+        hover:file:bg-indigo-100">
+      <button id="process-excel-btn" class="px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-semibold whitespace-nowrap">Upload & Process</button>
+    </div>
+    <div id="upload-status" class="mt-4 text-sm text-gray-600"></div>
+  </div>
+
+  <div class="grid xl:grid-cols-3 gap-8">
+    </div>
+</div>
+      <div class="grid xl:grid-cols-3 gap-8">
+        <div class="xl:col-span-1">
+          <div class="glass-card rounded-3xl shadow-xl overflow-hidden">
+            <div class="bg-gradient-to-r from-primary to-secondary p-6"><h2 class="text-2xl font-bold text-white flex items-center"><svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg><span id="form-title">Register New Student</span></h2></div>
+            <div class="p-6">
+              <form id="student-form" class="space-y-6">
+                <div><label class="block text-sm font-semibold text-gray-700 mb-2">Full Name</label><input type="text" id="student-name" class="w-full px-4 py-3 rounded-xl border border-gray-200" placeholder="Enter full name" required></div>
+                
+                <div>
+                    <label for="student-groups" class="block text-sm font-semibold text-gray-700 mb-2">Student Groups (Select multiple)</label>
+                    <select id="student-groups" class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white" multiple required>
+                        <!-- Options loaded by JS -->
+                    </select>
+                </div>
+
+                <div><label class="block text-sm font-semibold text-gray-700 mb-2">Roll Number</label><input type="text" id="student-roll" class="w-full px-4 py-3 rounded-xl border border-gray-200" placeholder="e.g., 001, 025"></div>
+                <div><label class="block text-sm font-semibold text-gray-700 mb-2">Student Email</label><input type="email" id="student-email" class="w-full px-4 py-3 rounded-xl border border-gray-200" placeholder="student@college.edu"></div>
+                
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">Student Photo (for Face ID)</label>
+                  <div class="flex items-center space-x-4">
+                    <label class="px-4 py-2 bg-gray-100 rounded-xl cursor-pointer"><span class="text-sm font-medium">Upload Photo</span><input type="file" id="student-photo" accept="image/*" class="hidden" onchange="previewPhoto(event)"></label>
+                    <div id="photo-preview" class="w-12 h-12 photo-placeholder rounded-full flex items-center justify-center"><span id="photo-initials" class="text-white font-bold text-sm">?</span><img id="photo-img" class="w-12 h-12 rounded-full object-cover hidden" alt="Preview"></div>
+                  </div>
+                </div>
+                
+                <div class="flex space-x-3">
+                  <button type="submit" class="flex-1 bg-gradient-to-r from-success to-emerald-600 text-white py-3 rounded-xl font-semibold"><span id="submit-btn-text">Register Student</span></button>
+                  <button type="button" id="cancel-btn" class="px-6 py-3 bg-gray-500 text-white rounded-xl font-semibold hidden" onclick="resetStudentForm()">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        
+        <div class="xl:col-span-2">
+          <div class="glass-card rounded-3xl shadow-xl overflow-hidden">
+            <div class="bg-gradient-to-r from-secondary to-purple-600 p-6 flex items-center justify-between"><h2 class="text-2xl font-bold text-white flex items-center"><svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 4.354a4 4 1 111 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m8.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/></svg>Registered Students</h2><span class="bg-white/20 px-3 py-1 rounded-full text-sm font-medium" id="student-count">0 Total</span></div>
+            <div class="p-6">
+              <div class="mb-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <input type="text" id="student-search" placeholder="Search students by name..." class="w-full px-4 py-2 rounded-lg border border-gray-200 md:col-span-1">
+                  <select id="student-course-filter" class="w-full px-4 py-2 rounded-lg border border-gray-200 appearance-none bg-white"><option value="">Filter by Course</option></select>
+                  <select id="student-group-filter" class="w-full px-4 py-2 rounded-lg border border-gray-200 appearance-none bg-white"><option value="">Filter by Group</option></select>
+              </div>
+              <div class="overflow-x-auto"><table class="w-full"><thead><tr class="border-b-2 border-gray-100"><th class="text-left py-4 px-4 font-semibold text-gray-700">Photo</th><th class="text-left py-4 px-4 font-semibold text-gray-700">Name</th><th class="text-left py-4 px-4 font-semibold text-gray-700">Groups</th><th class="text-left py-4 px-4 font-semibold text-gray-700">Roll</th><th class="text-left py-4 px-4 font-semibold text-gray-700">Actions</th></tr></thead><tbody id="students-table-body"></tbody></table></div>
+              <div id="no-students" class="text-center py-12 hidden"><p class="text-gray-500 text-lg">No students registered yet</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <div id="content-faculty" class="tab-content hidden">
+        <div class="grid md:grid-cols-2 gap-8">
+          <div class="glass-card rounded-3xl shadow-xl overflow-hidden">
+              <div class="bg-gradient-to-r from-accent to-blue-600 p-6"><h2 class="text-2xl font-bold text-white flex items-center"><svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 1 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 10V3L4 14h7v7l9-11h-7z" /></svg>Create New Faculty</h2></div>
+              <div class="p-6">
+                  <form id="faculty-form" class="space-y-4">
+                      <div><label class="block text-sm font-semibold text-gray-700 mb-2">Full Name</label><input type="text" id="faculty-name" placeholder="Enter full name" class="w-full px-4 py-3 rounded-xl border border-gray-200" required></div>
+                      <div><label class="block text-sm font-semibold text-gray-700 mb-2">Email</label><input type="email" id="faculty-email" placeholder="faculty@college.edu" class="w-full px-4 py-3 rounded-xl border border-gray-200" required></div>
+                      <div><label class="block text-sm font-semibold text-gray-700 mb-2">Password (min. 8 chars)</label><input type="password" id="faculty-password" placeholder="Create a temporary password" class="w-full px-4 py-3 rounded-xl border border-gray-200" required></div>
+                      <button type="submit" id="add-faculty-btn" class="w-full px-6 py-3 bg-gradient-to-r from-accent to-blue-600 text-white rounded-xl font-semibold">Add Faculty</button>
+                  </form>
+              </div>
+          </div>
+          <div class="glass-card rounded-3xl shadow-xl overflow-hidden">
+            <div class="bg-gradient-to-r from-gray-700 to-gray-900 p-6"><h2 class="text-2xl font-bold text-white flex items-center"><svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.084-1.284-.24-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.084-1.284.24-1.857m10.28-2.28a.75.75 0 00-1.06-1.06c-1.518.06-3.078.06-4.596 0a.75.75 0 00-1.06 1.06c-1.518.06-3.078.06-4.596 0a.75.75 0 00-1.06 1.06c-1.518.06-3.078.06-4.596 0" /></svg>Faculty List</h2></div>
+            <div class="p-6">
+                <div class="space-y-2 mt-4 max-h-96 overflow-y-auto" id="faculty-list">
+                    <!-- Faculty list loaded by JS -->
+                </div>
+            </div>
+          </div>
+        </div>
+    </div>
+
+
+    <div id="content-academics" class="tab-content hidden">
+      <div class="grid md:grid-cols-2 gap-8">
+        <div class="glass-card rounded-3xl shadow-xl overflow-hidden">
+            <div class="bg-gradient-to-r from-blue-600 to-blue-800 p-6"><h2 class="text-2xl font-bold text-white flex items-center"><svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13.5M12 6.253A4.5 4.5 0 007.5 10.75M12 6.253A4.5 4.5 0 0116.5 10.75M7.5 10.75A4.5 4.5 0 013 15.253M7.5 10.75A4.5 4.5 0 0012 15.253M16.5 10.75A4.5 4.5 0 0121 15.253M16.5 10.75A4.5 4.5 0 0012 15.253M3 15.253A4.5 4.5 0 007.5 19.753M12 15.253A4.5 4.5 0 0016.5 19.753M21 15.253A4.5 4.5 0 0116.5 19.753" /></svg>Manage Courses</h2></div>
+            <div class="p-6">
+                <form id="add-course-form" class="flex space-x-3 mb-4">
+                    <input type="text" id="new-course-name" placeholder="Course Name (e.g., Physics 101)" class="flex-1 px-4 py-3 rounded-xl border border-gray-200" required>
+                    <input type="text" id="new-course-code" placeholder="Course Code" class="w-32 px-4 py-3 rounded-xl border border-gray-200">
+                    <button type="submit" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-xl font-semibold">Add</button>
+                </form>
+                <div class="space-y-2 max-h-96 overflow-y-auto" id="courses-list"></div>
+            </div>
+        </div>
+        <div class="glass-card rounded-3xl shadow-xl overflow-hidden"><div class="bg-gradient-to-r from-orange-500 to-orange-700 p-6"><h2 class="text-2xl font-bold text-white flex items-center"><svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>Manage Student Groups</h2></div>
+          <div class="p-6">
+            <form id="add-group-form" class="space-y-4 mb-4">
+              <div class="flex space-x-3">
+                <input type="text" id="new-group-name" placeholder="Group Name (e.g., CS Batch A)" class="flex-1 px-4 py-3 rounded-xl border border-gray-200" required>
+                <button type="submit" class="px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-700 text-white rounded-xl font-semibold">Add Group</button>
+              </div>
+            </form>
+            <div class="space-y-2 mt-4 max-h-96 overflow-y-auto" id="student-groups-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="content-scheduler" class="tab-content hidden">
+       <div class="grid md:grid-cols-2 gap-8">
+          <div class="glass-card rounded-3xl shadow-xl overflow-hidden">
+              <div class="bg-gradient-to-r from-purple-600 to-purple-800 p-6"><h2 class="text-2xl font-bold text-white flex items-center"><svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>New Lecture Schedule</h2></div>
+              <div class="p-6">
+                  <form id="scheduler-form" class="space-y-4">
+                      <div class="grid grid-cols-2 gap-3">
+                          <div><label class="block text-sm font-semibold text-gray-700 mb-1">Course</label><select id="schedule-course" class="w-full px-4 py-3 rounded-xl border border-gray-200 appearance-none bg-white" required><option value="">Select Course</option></select></div>
+                          <div><label class="block text-sm font-semibold text-gray-700 mb-1">Teacher</label><select id="schedule-teacher" class="w-full px-4 py-3 rounded-xl border border-gray-200 appearance-none bg-white" required><option value="">Select Teacher</option></select></div>
+                      </div>
+                      <div class="grid grid-cols-3 gap-3">
+                          <div><label class="block text-sm font-semibold text-gray-700 mb-1">Day</label><select id="schedule-day" class="w-full px-4 py-3 rounded-xl border border-gray-200 appearance-none bg-white" required>
+                            <option value="">Select Day</option>
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                            <option value="0">Sunday</option>
+                          </select></div>
+                          <div><label class="block text-sm font-semibold text-gray-700 mb-1">Start Time</label><input type="time" id="schedule-start-time" class="w-full px-4 py-3 rounded-xl border border-gray-200" required></div>
+                          <div><label class="block text-sm font-semibold text-gray-700 mb-1">End Time</label><input type="time" id="schedule-end-time" class="w-full px-4 py-3 rounded-xl border border-gray-200" required></div>
+                      </div>
+                      <div>
+                        <label for="schedule-groups" class="block text-sm font-semibold text-gray-700 mb-1">Student Groups (Select multiple)</label>
+                        <select id="schedule-groups" class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white" multiple required>
+                            <!-- Groups loaded by JS -->
+                        </select>
+                      </div>
+                      <button type="submit" id="add-schedule-btn" class="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-xl font-semibold">Add Schedule</button>
+                  </form>
+              </div>
+          </div>
+          <div class="glass-card rounded-3xl shadow-xl overflow-hidden">
+            <div class="bg-gradient-to-r from-gray-700 to-gray-900 p-6"><h2 class="text-2xl font-bold text-white flex items-center"><svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Weekly Schedule</h2></div>
+            <div class="p-6">
+                <div class="space-y-3 mt-4 max-h-[500px] overflow-y-auto" id="schedules-list">
+                    <!-- Schedule list loaded by JS -->
+                </div>
+            </div>
+          </div>
+        </div>
+    </div>
+
+
+    <div id="content-attendance" class="tab-content hidden">
+      <div class="glass-card rounded-3xl shadow-xl p-6">
+        <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <h2 class="text-2xl font-bold text-gray-800">Attendance Log</h2>
+          <div class="flex items-center gap-4 flex-wrap">
+            <div class="relative">
+                <select id="attendance-course" class="w-full px-4 py-3 rounded-xl border border-gray-200 appearance-none bg-white"><option value="">Select Course</option></select>
+            </div>
+            <div class="relative">
+                <select id="attendance-group" class="w-full px-4 py-3 rounded-xl border border-gray-200 appearance-none bg-white"><option value="">All Groups</option></select>
+            </div>
+            <input type="date" id="attendance-date-picker" class="px-4 py-3 rounded-xl border border-gray-200">
+          </div>
+        </div>
+        <div class="p-6 bg-gray-50 rounded-2xl">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div class="bg-white rounded-xl p-4 text-center shadow-sm"><div class="text-2xl font-bold text-green-600" id="attendance-present-count">--</div><div class="text-sm text-gray-500">Present</div></div>
+              <div class="bg-white rounded-xl p-4 text-center shadow-sm"><div class="text-2xl font-bold text-amber-600" id="attendance-late-count">--</div><div class="text-sm text-gray-500">Late</div></div>
+              <div class="bg-white rounded-xl p-4 text-center shadow-sm"><div class="text-2xl font-bold text-red-600" id="attendance-absent-count">--</div><div class="text-sm text-gray-500">Absent</div></div>
+            </div>
+        </div>
+        <div id="attendance-holiday-notice" class="text-center py-12 hidden"><p class="text-gray-500 text-lg">This day is marked as a holiday.</p></div>
+        <div id="attendance-table-container" class="mt-6">
+            <div class="overflow-x-auto"><table class="w-full"><thead><tr class="border-b-2 border-gray-100">
+                <th class="text-left py-3 px-4 font-semibold text-gray-700">Student</th>
+                <th class="text-left py-3 px-4 font-semibold text-gray-700">Roll</th>
+                <th class="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+                <th class="text-left py-3 px-4 font-semibold text-gray-700">Check-in Time</th>
+                <th class="text-left py-3 px-4 font-semibold text-gray-700">Proof</th>
+                <th class="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
+            </tr></thead><tbody id="attendance-table-body"></tbody></table></div>
+            <div id="no-attendance-data" class="text-center py-12 hidden"><p class="text-gray-500 text-lg">No attendance data for this day.</p></div>
+        </div>
+      </div>
+    </div>
+    
+   
+    <div id="content-settings" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="glass-card rounded-3xl shadow-xl overflow-hidden"><div class="p-6"><h3 class="text-xl font-bold text-gray-800 mb-4">General Settings</h3><form id="settings-form" class="space-y-4"><div><label for="late-time" class="block text-sm font-semibold text-gray-700">Mark 'Late' After</label><input type="time" id="late-time" class="w-full mt-1 px-4 py-2 rounded-lg border border-gray-200"></div><button type="submit" class="w-full px-6 py-3 bg-primary text-white rounded-xl font-semibold">Save General Settings</button></form></div></div>
+            <div class="glass-card rounded-3xl shadow-xl overflow-hidden"><div class="p-6"><h3 class="text-xl font-bold text-gray-800 mb-4">Manage Holidays</h3><form id="holiday-form" class="space-y-4 mb-4"><div class="grid grid-cols-2 gap-3"><input type="date" id="holiday-date" required class="px-4 py-2 rounded-lg border border-gray-200"><input type="text" id="holiday-desc" placeholder="Holiday description" required class="px-4 py-2 rounded-lg border border-gray-200"></div><button type="submit" class="w-full px-6 py-3 bg-primary text-white rounded-xl font-semibold">Add Holiday</button></form><ul id="holidays-list" class="space-y-2 max-h-48 overflow-y-auto"></ul></div></div>
+            
+            <div class="glass-card rounded-3xl shadow-xl lg:col-span-2 overflow-hidden">
+                <div class="p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Email Automation</h3>
+                    <form id="email-settings-form" class="space-y-4">
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <label for="email-enabled" class="font-medium text-gray-700">Enable Automated Email Alerts</label>
+                            <input type="checkbox" id="email-enabled" class="h-6 w-6 rounded text-primary focus:ring-primary">
+                        </div>
+                        <div id="email-controls-container" class="space-y-4 pt-4 border-t">
+                            <div><label for="overall-threshold" class="block text-sm font-semibold text-gray-700">Overall Attendance Threshold (%)</label><input type="number" id="overall-threshold" min="1" max="100" placeholder="e.g., 75" class="w-full mt-1 px-4 py-2 rounded-lg border border-gray-200"></div>
+                            <div><label for="course-threshold" class="block text-sm font-semibold text-gray-700">Individual Course Threshold (%)</label><input type="number" id="course-threshold" min="1" max="100" placeholder="e.g., 60" class="w-full mt-1 px-4 py-2 rounded-lg border border-gray-200"></div>
+                            <button type="submit" id="save-email-settings-btn" class="w-full px-6 py-3 bg-primary text-white rounded-xl font-semibold">Save Automation Rules</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+  </div>
+
+  <!-- NEW: Image Proof Modal -->
+  <div id="image-proof-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <div id="proof-modal-overlay" class="modal-overlay fixed inset-0 bg-black opacity-50"></div>
+    <div class="glass-card modal-container w-full max-w-lg rounded-2xl shadow-2xl z-50">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-bold text-gray-900">Attendance Proof</h3>
+                <button id="proof-modal-close" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
+            </div>
+            <div id="image-proof-container" class="max-h-96 overflow-y-auto space-y-4">
+                <!-- Images will be loaded here by JS -->
+            </div>
+        </div>
+    </div>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="scripts/admin.js"></script>
+</body>
+</html>
+
+

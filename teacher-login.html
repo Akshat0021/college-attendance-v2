@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Faculty Portal Login - AttendanceFlow</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .glass-effect {
+      backdrop-filter: blur(12px);
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-indigo-100 to-white">
+
+  <nav class="sticky top-0 z-50 border-b border-gray-200/50" style="backdrop-filter: blur(12px); background: rgba(255, 255, 255, 0.1);">
+    <div class="container mx-auto px-4 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div class="w-8 h-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          </div>
+          <a href="/index.html" class="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">AttendanceFlow</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="flex items-center justify-center min-h-[calc(100vh-80px)]">
+    <div class="w-full max-w-md px-6 py-12 rounded-3xl shadow-2xl glass-effect">
+      <div class="flex flex-col items-center mb-8">
+        <div class="w-16 h-16 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400 rounded-2xl flex items-center justify-center shadow-lg">
+          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+          </svg>
+        </div>
+        <h1 class="mt-5 text-3xl font-extrabold text-gray-900 tracking-tight">Faculty Portal</h1>
+        <p class="mt-2 text-sm text-gray-500">Sign in to manage your lectures</p>
+      </div>
+      
+      <form id="teacherLoginForm" class="space-y-6">
+        <div>
+          <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+          <div class="mt-2 relative">
+            <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@college.edu" class="w-full rounded-lg border border-gray-300 px-4 py-3 mt-1 focus:ring-2 focus:ring-indigo-300 focus:border-transparent transition"/>
+          </div>
+        </div>
+        <div>
+          <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+          <div class="mt-2 relative">
+            <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••" class="w-full rounded-lg border border-gray-300 px-4 py-3 mt-1 focus:ring-2 focus:ring-indigo-300 focus:border-transparent transition"/>
+          </div>
+        </div>
+        
+        <div id="error-message" class="hidden p-3 bg-red-100 text-red-700 rounded-lg text-sm"></div>
+
+        <button type="submit" id="submitBtn" class="block text-center w-full py-3 px-6 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold text-lg shadow-md hover:from-indigo-600 hover:to-blue-600 hover:shadow-lg transition disabled:opacity-50">
+          Sign in
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script src="scripts/teacher-login.js"></script>
+</body>
+</html>

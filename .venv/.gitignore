@@ -1,0 +1,7 @@
+Include/
+Lib/
+insightface/
+Scripts/
+share/
+
+pyvenv.cfg
