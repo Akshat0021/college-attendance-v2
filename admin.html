@@ -106,37 +106,35 @@
     
     <div id="content-students" class="tab-content hidden">
 
-  <div class="glass-card rounded-3xl shadow-xl p-6 mb-8">
-    <h3 class="text-xl font-bold text-gray-800 mb-4">Bulk Student Upload</h3>
-    <p class="text-sm text-gray-600 mb-4">
-      Upload an Excel file (.xlsx) with student data. Make sure the columns match the template:
-      <code class="text-xs bg-gray-100 p-1 rounded">Name</code>,
-      <code class="text-xs bg-gray-100 p-1 rounded">Roll_Number</code>,
-      <code class="text-xs bg-gray-100 p-1 rounded">Parent_Phone</code>,
-      <code class="text-xs bg-gray-100 p-1 rounded">Class</code>,
-      <code class="text-xs bg-gray-100 p-1 rounded">Section</code>,
-      <code class="text-xs bg-gray-100 p-1 rounded">Image_URL</code>.
-    </p>
+      <div class="glass-card rounded-3xl shadow-xl p-6 mb-8">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">Bulk Student Upload</h3>
+        <p class="text-sm text-gray-600 mb-4">
+          Upload an Excel file (.xlsx) with student data. Make sure the columns match the template:
+          <code class="text-xs bg-gray-100 p-1 rounded">Name</code>,
+          <code class="text-xs bg-gray-100 p-1 rounded">Roll_Number</code>,
+          <code class="text-xs bg-gray-100 p-1 rounded">Email</code>,
+          <code class="text-xs bg-gray-100 p-1 rounded">Student_Group</code>,
+          <code class="text-xs bg-gray-100 p-1 rounded">Image_URL</code>.
+        </p>
+        <p class="text-sm text-gray-600 mb-4">
+          The <code class="text-xs bg-gray-100 p-1 rounded">Student_Group</code> must be the <strong>exact name</strong> of a group you have already created in the "Academics" tab.
+        </p>
 
-    <div class="note bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-sm mb-4">
-      <strong>Important:</strong> The <code>Image_URL</code> must be a direct, public link to a JPG or PNG file. Google Drive links will not work unless they are direct download links.
-    </div>
+        <div class="note bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-sm mb-4">
+          <strong>Important:</strong> The <code>Image_URL</code> must be a direct, public link to a JPG or PNG file. Google Drive links will not work unless they are direct download links.
+        </div>
 
-    <div class="flex items-center space-x-4">
-      <input type="file" id="student-excel-file" accept=".xlsx, .xls" class="block w-full text-sm text-gray-500
-        file:mr-4 file:py-2 file:px-4
-        file:rounded-xl file:border-0
-        file:text-sm file:font-semibold
-        file:bg-indigo-50 file:text-primary
-        hover:file:bg-indigo-100">
-      <button id="process-excel-btn" class="px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-semibold whitespace-nowrap">Upload & Process</button>
-    </div>
-    <div id="upload-status" class="mt-4 text-sm text-gray-600"></div>
-  </div>
-
-  <div class="grid xl:grid-cols-3 gap-8">
-    </div>
-</div>
+        <div class="flex items-center space-x-4">
+          <input type="file" id="student-excel-file" accept=".xlsx, .xls" class="block w-full text-sm text-gray-500
+            file:mr-4 file:py-2 file:px-4
+            file:rounded-xl file:border-0
+            file:text-sm file:font-semibold
+            file:bg-indigo-50 file:text-primary
+            hover:file:bg-indigo-100">
+          <button id="process-excel-btn" class="px-6 py-3 bg-gradient-to-r from-primary to-secondary text-white rounded-xl font-semibold whitespace-nowrap">Upload & Process</button>
+        </div>
+        <div id="upload-status" class="mt-4 text-sm text-gray-600"></div>
+      </div>
       <div class="grid xl:grid-cols-3 gap-8">
         <div class="xl:col-span-1">
           <div class="glass-card rounded-3xl shadow-xl overflow-hidden">
@@ -148,8 +146,7 @@
                 <div>
                     <label for="student-groups" class="block text-sm font-semibold text-gray-700 mb-2">Student Groups (Select multiple)</label>
                     <select id="student-groups" class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white" multiple required>
-                        <!-- Options loaded by JS -->
-                    </select>
+                        </select>
                 </div>
 
                 <div><label class="block text-sm font-semibold text-gray-700 mb-2">Roll Number</label><input type="text" id="student-roll" class="w-full px-4 py-3 rounded-xl border border-gray-200" placeholder="e.g., 001, 025"></div>
@@ -207,8 +204,7 @@
             <div class="bg-gradient-to-r from-gray-700 to-gray-900 p-6"><h2 class="text-2xl font-bold text-white flex items-center"><svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.084-1.284-.24-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.084-1.284.24-1.857m10.28-2.28a.75.75 0 00-1.06-1.06c-1.518.06-3.078.06-4.596 0a.75.75 0 00-1.06 1.06c-1.518.06-3.078.06-4.596 0a.75.75 0 00-1.06 1.06c-1.518.06-3.078.06-4.596 0" /></svg>Faculty List</h2></div>
             <div class="p-6">
                 <div class="space-y-2 mt-4 max-h-96 overflow-y-auto" id="faculty-list">
-                    <!-- Faculty list loaded by JS -->
-                </div>
+                    </div>
             </div>
           </div>
         </div>
@@ -269,8 +265,7 @@
                       <div>
                         <label for="schedule-groups" class="block text-sm font-semibold text-gray-700 mb-1">Student Groups (Select multiple)</label>
                         <select id="schedule-groups" class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white" multiple required>
-                            <!-- Groups loaded by JS -->
-                        </select>
+                            </select>
                       </div>
                       <button type="submit" id="add-schedule-btn" class="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-800 text-white rounded-xl font-semibold">Add Schedule</button>
                   </form>
@@ -280,8 +275,7 @@
             <div class="bg-gradient-to-r from-gray-700 to-gray-900 p-6"><h2 class="text-2xl font-bold text-white flex items-center"><svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Weekly Schedule</h2></div>
             <div class="p-6">
                 <div class="space-y-3 mt-4 max-h-[500px] overflow-y-auto" id="schedules-list">
-                    <!-- Schedule list loaded by JS -->
-                </div>
+                    </div>
             </div>
           </div>
         </div>
@@ -352,7 +346,6 @@
 
   </div>
 
-  <!-- NEW: Image Proof Modal -->
   <div id="image-proof-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
     <div id="proof-modal-overlay" class="modal-overlay fixed inset-0 bg-black opacity-50"></div>
     <div class="glass-card modal-container w-full max-w-lg rounded-2xl shadow-2xl z-50">
@@ -362,8 +355,7 @@
                 <button id="proof-modal-close" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
             </div>
             <div id="image-proof-container" class="max-h-96 overflow-y-auto space-y-4">
-                <!-- Images will be loaded here by JS -->
-            </div>
+                </div>
         </div>
     </div>
   </div>
@@ -372,5 +364,3 @@
   <script src="scripts/admin.js"></script>
 </body>
 </html>
-
-

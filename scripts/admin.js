@@ -1,5 +1,3 @@
-
-
 // ====================================================
 // SUPABASE & API CONFIGURATION
 // ====================================================
@@ -65,7 +63,11 @@ window.addEventListener('load', async () => {
 
 async function initializePage() {
     document.getElementById('college-name-display').textContent = collegeName;
+    
+    // =================== MODIFIED: Attaching listener ===================
     document.getElementById('process-excel-btn').addEventListener('click', handleExcelUpload);
+    // ====================================================================
+
     const datePicker = document.getElementById('attendance-date-picker');
     if (datePicker) {
         datePicker.value = new Date().toISOString().split('T')[0];
@@ -507,8 +509,7 @@ async function loadAttendanceData() {
                 <td class="py-3 px-4 text-gray-500">${student.roll_number || 'N/A'}</td>
                 <td class="py-3 px-4">${getAttendanceStatusBadge(status)}</td>
                 <td class="py-3 px-4 text-gray-500">${time}</td>
-                <td class="py-3 px-4">${proofButton}</td> <!-- *** NEW COLUMN *** -->
-                <td class="py-3 px-4">
+                <td class="py-3 px-4">${proofButton}</td> <td class="py-3 px-4">
                     <div class="flex space-x-2">
                         <button onclick="manualSetStatus('${student.id}', 'present')" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'present' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-700'}">Present</button>
                         <button onclick="manualSetStatus('${student.id}', 'late')" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'late' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-700'}">Late</button>
@@ -1344,47 +1345,38 @@ async function updateStudentGroupFilter(courseId) {
     groupSelect.innerHTML = '<option value="">All Groups</section>' + data.map(s => `<option value="${s.id}">${s.group_name}</option>`).join('');
 }
 
+
+// ====================================================
+// ====================================================
+//          NEW BULK UPLOAD FUNCTIONS
+// ====================================================
+// ====================================================
+
 /**
- * Fetches all classes and sections for the current school and returns a map.
- * @returns {Map<string, string>} A map where key is "ClassName-SectionName" and value is "section_id".
+ * Fetches all student groups for the current college and returns a map.
+ * @returns {Map<string, string>} A map where key is "group_name" and value is "group_id".
  */
-async function getClassSectionMap() {
-    const classSectionMap = new Map();
+async function getStudentGroupMap() {
+    const groupMap = new Map();
 
-    // 1. Fetch all classes for the school
-    const { data: classes, error: classError } = await db
-        .from('classes')
-        .select('id, name')
-        .eq('school_id', schoolId);
+    // 1. Fetch all student groups for the college
+    const { data: groups, error: groupError } = await db
+        .from('student_groups')
+        .select('id, group_name')
+        .eq('college_id', collegeId);
 
-    if (classError) throw new Error(`Failed to fetch classes: ${classError.message}`);
+    if (groupError) throw new Error(`Failed to fetch student groups: ${groupError.message}`);
 
-    if (!classes || classes.length === 0) {
-        return classSectionMap; // No classes, return empty map
+    if (!groups || groups.length === 0) {
+        return groupMap; // No groups, return empty map
     }
 
-    const classIds = classes.map(c => c.id);
-
-    // 2. Fetch all sections for those classes
-    const { data: sections, error: sectionError } = await db
-        .from('sections')
-        .select('id, name, class_id')
-        .in('class_id', classIds);
-
-    if (sectionError) throw new Error(`Failed to fetch sections: ${sectionError.message}`);
-
-    // 3. Create the lookup map
-    const classNameMap = new Map(classes.map(c => [c.id, c.name]));
-
-    sections.forEach(section => {
-        const className = classNameMap.get(section.class_id);
-        if (className) {
-            const key = `${className}-${section.name}`; // e.g., "10th Grade-A"
-            classSectionMap.set(key, section.id);
-        }
+    // 2. Create the lookup map
+    groups.forEach(group => {
+        groupMap.set(group.group_name, group.id);
     });
 
-    return classSectionMap;
+    return groupMap;
 }
 
 /**
@@ -1407,17 +1399,20 @@ async function handleExcelUpload() {
     processBtn.textContent = 'Processing...';
 
     try {
-        // 1. Get the Class-Section mapping
-        statusDiv.textContent = 'Fetching class and section data...';
-        const classSectionMap = await getClassSectionMap();
-        if (classSectionMap.size === 0) {
-            throw new Error("No classes or sections are set up. Please add classes and sections before uploading.");
+        // 1. Get the Student Group mapping
+        statusDiv.textContent = 'Fetching student group data...';
+        const groupMap = await getStudentGroupMap();
+        if (groupMap.size === 0) {
+            throw new Error("No Student Groups are set up. Please add groups in the 'Academics' tab before uploading.");
         }
 
         // 2. Read and Parse the Excel file
         statusDiv.textContent = 'Parsing Excel file...';
         const reader = new FileReader();
         reader.onload = async (e) => {
+            let studentsPayload = [];
+            let validationErrors = [];
+
             try {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
@@ -1431,32 +1426,28 @@ async function handleExcelUpload() {
 
                 // 3. Validate and map data
                 statusDiv.textContent = `Found ${json.length} records. Validating...`;
-                const studentsPayload = [];
-                const validationErrors = [];
 
-                for (const row of json) {
-                    const className = row.Class?.trim();
-                    const sectionName = row.Section?.trim();
-                    const sectionKey = `${className}-${sectionName}`;
-                    const section_id = classSectionMap.get(sectionKey);
+                for (const [index, row] of json.entries()) {
+                    const groupName = row.Student_Group?.trim();
+                    const group_id = groupMap.get(groupName);
 
-                    if (!section_id) {
-                        validationErrors.push(`Row ${json.indexOf(row) + 2}: Could not find matching Section for Class "${className}" and Section "${sectionName}".`);
+                    if (!group_id) {
+                        validationErrors.push(`Row ${index + 2}: Could not find a matching Student Group named "${groupName}".`);
                         continue;
                     }
 
                     if (!row.Name || !row.Roll_Number || !row.Image_URL) {
-                         validationErrors.push(`Row ${json.indexOf(row) + 2}: Missing required data (Name, Roll_Number, or Image_URL).`);
+                         validationErrors.push(`Row ${index + 2}: Missing required data (Name, Roll_Number, or Image_URL).`);
                         continue;
                     }
 
                     studentsPayload.push({
                         name: String(row.Name),
                         roll_number: String(row.Roll_Number),
-                        parent_phone_number: row.Parent_Phone ? String(row.Parent_Phone) : null,
+                        email: row.Email ? String(row.Email) : null,
                         image_url: String(row.Image_URL),
-                        section_id: section_id,
-                        school_id: schoolId, // Global schoolId
+                        group_id: group_id,
+                        college_id: collegeId, // Global collegeId
                     });
                 }
 
@@ -1464,26 +1455,72 @@ async function handleExcelUpload() {
                     throw new Error(`Validation failed:\n- ${validationErrors.join('\n- ')}`);
                 }
 
-                // 4. Invoke the Edge Function
-                statusDiv.textContent = `Validation complete. Uploading ${studentsPayload.length} students to the backend for processing...`;
+                // 4. Invoke the Edge Function *one by one*
+                statusDiv.textContent = `Validation complete. Uploading ${studentsPayload.length} students...`;
+                
+                let processedCount = 0;
+                let errorCount = 0;
+                const errors = [];
 
-                const { data: result, error: funcError } = await db.functions.invoke('bulk-add-students', {
-                    body: { students: studentsPayload }
-                });
+                for (const student of studentsPayload) {
+                    statusDiv.textContent = `Uploading ${processedCount + errorCount + 1} of ${studentsPayload.length}: ${student.name}...`;
+                    
+                    try {
+                        // ** ================== MODIFIED PART ================== **
+                        // We now send the student object wrapped in a "student" key
+                        const { data: result, error: funcError } = await db.functions.invoke('bulk-add-students', {
+                            body: { student: student } // Wrap it here
+                        });
+                        // ** =================================================== **
 
-                if (funcError) throw funcError;
+                        if (funcError) {
+                            throw funcError; // Throw the FunctionsHttpError
+                        }
 
-                // 5. Show results
-                statusDiv.textContent = result.message;
-                statusDiv.className = 'mt-4 text-sm text-green-700';
-                showNotification(result.message, 'success');
+                        // If we are here, it's a success
+                        processedCount++;
 
-                if (result.errors && result.errors.length > 0) {
-                    console.error("Processing errors:", result.errors);
-                    statusDiv.innerHTML += `<br><strong class="text-red-600">Some students failed:</strong><ul class="list-disc pl-5"><li>${result.errors.join('</li><li>')}</li></ul>`;
+                    } catch (error) {
+                        // This will catch the FunctionsHttpError
+                        errorCount++;
+                        
+                        let specificErrorMessage = "Edge Function returned a non-2xx status code";
+                        
+                        console.error(`Raw error object for ${student.name}:`, error); // Log the whole error
+
+                        if (error.context && error.context.error) {
+                            specificErrorMessage = error.context.error;
+                        } else if (error.context && error.context.message) {
+                            specificErrorMessage = error.context.message;
+                        } else if (error.context && typeof error.context === 'string') {
+                             try {
+                                const parsed = JSON.parse(error.context);
+                                specificErrorMessage = parsed.error || parsed.message || "Could not parse error string.";
+                            } catch (e) {
+                                specificErrorMessage = error.context;
+                            }
+                        } else if (error.message) {
+                            specificErrorMessage = error.message;
+                        }
+
+                        console.error(`Error processing ${student.name}:`, specificErrorMessage);
+                        errors.push(`Failed to process ${student.name}: ${specificErrorMessage}`);
+                    }
                 }
 
-                await renderStudentsTable(); // Refresh the student list
+                // 5. Show final results
+                const finalMessage = `Process complete. Added ${processedCount} students. Failed ${errorCount} students.`;
+                statusDiv.textContent = finalMessage;
+                statusDiv.className = `mt-4 text-sm ${errorCount > 0 ? 'text-red-700' : 'text-green-700'}`;
+                showNotification(finalMessage, errorCount > 0 ? 'error' : 'success');
+
+                if (errors.length > 0) {
+                    console.error("Processing errors:", errors);
+                    statusDiv.innerHTML += `<br><strong class="text-red-600">Some students failed:</strong><ul class="list-disc pl-5"><li>${errors.join('</li><li>')}</li></ul>`;
+                }
+
+                await loadAllStudents(); // Refresh the student list
+                renderStudentsTable();
 
             } catch (innerError) {
                 console.error('Upload Error:', innerError);
