@@ -3,7 +3,7 @@
 // ====================================================
 const SUPABASE_URL = 'https://zlkleprvhjgjcjycezpu.supabase.co'; // Replace with your new project URL
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2xlcHJ2aGpnamNqeWNlenB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxNzAyNDcsImV4cCI6MjA3Nzc0NjI0N30.e1LkaKKXfDUOHOh1Oi6GY1lwpd5DZ5R-FkSP62XXGD0'; // Replace with your new project anon key
-const FACE_API_URL = 'http://127.0.0.1:5000'; // Replace with your deployed Python API URL
+const FACE_API_URL = 'https://ca.avinya.live:5000'; // Replace with your deployed Python API URL
 
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
