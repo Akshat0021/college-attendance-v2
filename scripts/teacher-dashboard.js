@@ -300,7 +300,7 @@ function updateStudentListUI() {
         el.innerHTML = `
             <div class="flex items-center space-x-3">
                 ${student.photo_url ? `<img src="${student.photo_url}" class="w-10 h-10 rounded-full object-cover">` : `<div class="w-10 h-10 photo-placeholder rounded-full flex items-center justify-center text-white font-semibold text-sm">${getInitials(student.name)}</div>`}
-                <div>
+                <div class="pr-10">
                     <div class="font-medium text-gray-900">${student.name}</div>
                     <div class="text-sm text-gray-500">Roll: ${student.roll_number || 'N/A'}</div>
                 </div>
