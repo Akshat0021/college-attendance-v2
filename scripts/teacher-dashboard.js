@@ -307,7 +307,7 @@ function updateStudentListUI() {
             </div>
             <div class="flex space-x-1">
                 <button data-index="${index}" data-status="present" class="attd-btn ${status === 'present' ? 'attd-btn-present active' : 'attd-btn-inactive'}">P</button>
-                <button data-index="${index}" data-status="late" class="attd-btn ${status === 'late' ? 'attd-btn-late active' : 'attd-btn-inactive'}">L</button>
+                <button data-index="${index}" data-status="late" class="hidden attd-btn ${status === 'late' ? 'attd-btn-late active' : 'attd-btn-inactive'}">L</button>
                 <button data-index="${index}" data-status="absent" class="attd-btn ${status === 'absent' ? 'attd-btn-absent active' : 'attd-btn-inactive'}">A</button>
             </div>
         `;
