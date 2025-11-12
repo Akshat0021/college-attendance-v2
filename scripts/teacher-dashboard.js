@@ -371,7 +371,7 @@ async function startCamera() {
 
     try {
         stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: { ideal: 'environment' } } 
+            video: { facingMode: { exact: 'environment' } } 
         });
     } catch (err) {
         // Fallback to any camera

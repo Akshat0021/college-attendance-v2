@@ -43,7 +43,7 @@ except Exception as e:
 def convert_score_to_percentage(score):
     return int(score * 100)
 
-def find_best_match(query_embedding, known_embeddings, known_ids, threshold=0.3):
+def find_best_match(query_embedding, known_embeddings, known_ids, threshold=0.15):
     if not known_ids or known_embeddings.shape[0] == 0:
         return None, 0.0
 
