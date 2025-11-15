@@ -3,7 +3,7 @@
 // ====================================================
 const SUPABASE_URL = 'https://zlkleprvhjgjcjycezpu.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpsa2xlcHJ2aGpnamNqeWNlenB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxNzAyNDcsImV4cCI6MjA3Nzc0NjI0N30.e1LkaKKXfDUOHOh1Oi6GY1lwpd5DZ5R-FkSP62XXGD0';
-const FACE_API_WS_URL = 'ws://192.168.1.117:5001'; // Make sure this is your Python server's URL
+const FACE_API_WS_URL = ''; // Make sure this is your Python server's URL
 
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
