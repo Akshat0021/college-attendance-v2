@@ -152,7 +152,7 @@ async function loadLectures() {
     lectures.forEach(lecture => {
         const isSubmitted = submittedScheduleIds.has(lecture.id);
         const card = document.createElement('div');
-        card.className = 'glass-card rounded-2xl hover:shadow-black shadow-lg p-6 flex flex-col justify-between hover:-translate-y-2 transition-all duration-300';
+        card.className = 'glass-card rounded-2xl hover:shadow-black/50 shadow-lg p-6 flex flex-col justify-between hover:-translate-y-2 transition-all duration-300';
         const groups = lecture.schedule_groups.map(sg => sg.student_groups.group_name).join(', ');
         const startTime = formatTime(lecture.start_time);
         let titlePrefix = lecture.is_extra_class ? '[Extra Class] ' : '';
