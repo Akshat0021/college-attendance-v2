@@ -152,7 +152,7 @@ async function loadLectures() {
     lectures.forEach(lecture => {
         const isSubmitted = submittedScheduleIds.has(lecture.id);
         const card = document.createElement('div');
-        card.className = 'glass-card rounded-2xl shadow-lg p-6 flex flex-col justify-between';
+        card.className = 'glass-card rounded-2xl hover:shadow-black shadow-lg p-6 flex flex-col justify-between hover:-translate-y-2 transition-all duration-300';
         const groups = lecture.schedule_groups.map(sg => sg.student_groups.group_name).join(', ');
         const startTime = formatTime(lecture.start_time);
         let titlePrefix = lecture.is_extra_class ? '[Extra Class] ' : '';
@@ -170,7 +170,7 @@ async function loadLectures() {
                 <p class="text-gray-600 mb-1"><strong>Time:</strong> ${timeDisplay}</p>
                 <p class="text-gray-600"><strong>Groups:</strong> ${groups}</p>
             </div>
-            <button class="take-attendance-btn w-full ${isSubmitted ? 'bg-green-600 hover:bg-green-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white py-3 px-6 rounded-xl font-bold text-base transition-all mt-6">
+            <button class="take-attendance-btn w-full ${isSubmitted ? 'bg-green-600 hover:bg-green-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white py-3 px-6 rounded-xl font-bold text-base transition-all mt-6 hover:shadow-green-600 shadow-lg">
                 ${isSubmitted ? 'Edit Attendance' : 'Take Attendance'}
             </button>
         `;
