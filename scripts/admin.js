@@ -19,9 +19,6 @@ let allStudentsCache = []; // Cache for student data
 // ====================================================
 // INITIALIZATION
 // ====================================================
-// We are using 'load' instead of 'DOMContentLoaded'
-// This waits for the entire page (including images and styles) to load,
-// ensuring all HTML elements are available before the script runs.
 window.addEventListener('load', async () => {
   const { data: { session } } = await db.auth.getSession();
   if (!session) {
@@ -64,31 +61,22 @@ window.addEventListener('load', async () => {
 async function initializePage() {
     document.getElementById('college-name-display').textContent = collegeName;
     
-    // =================== MODIFIED: Attaching listener ===================
     document.getElementById('process-excel-btn').addEventListener('click', handleExcelUpload);
-    // ====================================================================
 
     const datePicker = document.getElementById('attendance-date-picker');
     if (datePicker) {
         datePicker.value = new Date().toISOString().split('T')[0];
     }
     
-    // ====================================================
-    // A. HELPER FUNCTION TO ADD LISTENERS SAFELY
-    // ====================================================
     const addListener = (id, event, handler) => {
         const element = document.getElementById(id);
         if (element) {
             element.addEventListener(event, handler);
         } else {
-            // This error will tell us if the HTML is cached/wrong
             console.error(`FATAL: Element with ID '${id}' was not found. Your HTML file might be old.`);
         }
     };
 
-    // ====================================================
-    // B. ATTACH ALL EVENT LISTENERS USING THE HELPER
-    // ====================================================
     addListener('attendance-date-picker', 'change', loadAttendanceData);
     addListener('student-search', 'keyup', renderStudentsTable);
     addListener('student-form', 'submit', saveStudent);
@@ -103,7 +91,6 @@ async function initializePage() {
     addListener('email-settings-form', 'submit', handleEmailSettingsForm);
     addListener('email-enabled', 'change', toggleEmailControls);
     
-    // Attendance filter listeners
     const attendanceClassEl = document.getElementById('attendance-course');
     if (attendanceClassEl) {
         attendanceClassEl.addEventListener('change', async (e) => {
@@ -116,7 +103,6 @@ async function initializePage() {
     
     addListener('attendance-group', 'change', loadAttendanceData);
 
-    // Student form filter listeners
     const studentCourseFilterEl = document.getElementById('student-course-filter');
     if (studentCourseFilterEl) {
         studentCourseFilterEl.addEventListener('change', (e) => updateStudentGroupFilter(e.target.value));
@@ -124,16 +110,14 @@ async function initializePage() {
         console.error("FATAL: Element with ID 'student-course-filter' was not found.");
     }
 
-    // NEW: Modal listeners
     addListener('proof-modal-close', 'click', closeProofModal);
     addListener('proof-modal-overlay', 'click', closeProofModal);
 
-    // Load initial college-specific data
     await updateCourseSelectors();
     await updateTeacherSelectors();
     await updateStudentGroupSelectors();
-    await loadAllStudents(); // Load student cache
-    renderStudentsTable(); // Render from cache
+    await loadAllStudents(); 
+    renderStudentsTable(); 
     await loadDashboardMetrics();
     await loadHolidays();
     await loadSettings();
@@ -151,7 +135,7 @@ async function initializePage() {
 
 function toggleEmailControls() {
     const emailEnabled = document.getElementById('email-enabled');
-    if (!emailEnabled) return; // Guard clause
+    if (!emailEnabled) return;
 
     const isEnabled = emailEnabled.checked;
     const controlsContainer = document.getElementById('email-controls-container');
@@ -168,10 +152,6 @@ function toggleEmailControls() {
     });
 }
 
-
-// ====================================================
-// UTILITY & TAB MANAGEMENT
-// ====================================================
 function showNotification(message, type = 'success') {
   const container = document.getElementById('notification-container');
   const notification = document.createElement('div');
@@ -237,7 +217,6 @@ async function loadDashboardMetrics() {
         { data: groupData, error: groupError }
     ] = await Promise.all([
         db.from('attendance').select('student_id, status, date').gte('date', thirtyDaysAgoStr).in('student_id', studentIdsForCollege),
-        // Simplified query for dashboard
         db.from('student_groups').select(`group_name, student_group_members(students(id))`).eq('college_id', collegeId)
     ]);
     
@@ -246,10 +225,9 @@ async function loadDashboardMetrics() {
         return;
     }
 
-    // --- Calculate and Display Simple Metrics ---
     if (recentAttendance && recentAttendance.length > 0) {
         const presentOrLate = recentAttendance.filter(r => r.status === 'present' || r.status === 'late').length;
-        const rate = Math.round((presentOrLate / recentAttendance.length) * 100); // Rate of *marked* attendances
+        const rate = Math.round((presentOrLate / recentAttendance.length) * 100); 
         document.getElementById('metric-overall-attendance').textContent = `${rate}%`;
     } else {
         document.getElementById('metric-overall-attendance').textContent = 'N/A';
@@ -257,11 +235,9 @@ async function loadDashboardMetrics() {
 
     const todayAttd = recentAttendance ? recentAttendance.filter(r => r.date === todayStr) : [];
     const presentOrLateToday = todayAttd.filter(r => r.status === 'present' || r.status === 'late').length;
-    // Today's rate = present / total students in college
     const rateToday = studentsCount > 0 ? Math.round((presentOrLateToday / studentsCount) * 100) : 0;
     document.getElementById('metric-today-attendance').textContent = `${rateToday}%`;
 
-    // --- Top Present & Absentees Lists ---
     const topAbsenteesList = document.getElementById('metric-top-absentees');
     const topPresentList = document.getElementById('metric-top-present');
     topAbsenteesList.innerHTML = '';
@@ -308,7 +284,6 @@ async function loadDashboardMetrics() {
     if (topPresentList.children.length === 0) topPresentList.innerHTML = '<p class="text-gray-500">No attendance recorded in the last 30 days.</p>';
 
 
-    // --- Attendance by Group Chart ---
     const groupAttendance = [];
     if (groupData && recentAttendance) {
         for (const group of groupData) {
@@ -362,25 +337,42 @@ function getAttendanceStatusBadge(status) {
     return badges[status] || badges['absent'];
 }
 
-async function manualSetStatus(studentId, newStatus) {
+// ** UPDATED FUNCTION: Now accepts recordId **
+async function manualSetStatus(studentId, newStatus, recordId = null) {
     const selectedDate = document.getElementById('attendance-date-picker').value;
     
-    // We can't link to a schedule_id for a manual override,
-    // so we upsert with student_id and date.
-    const { error } = await db.from('attendance').upsert({
-        student_id: studentId,
-        date: selectedDate,
-        status: newStatus,
-        marked_at: new Date().toISOString()
-    }, {
-        onConflict: 'student_id, date' // Use this composite key
-    });
+    let error;
+
+    // Check if we are updating an existing record (by ID) or creating a new one
+    if (recordId && recordId !== 'null' && recordId !== 'undefined') {
+        // We have a specific record ID, so we UPDATE it. This is safe and avoids conflict errors.
+        const { error: updateError } = await db.from('attendance')
+            .update({
+                status: newStatus,
+                marked_at: new Date().toISOString()
+            })
+            .eq('id', recordId);
+        error = updateError;
+    } else {
+        // No record exists for this student on this day (or at least none we saw).
+        // We INSERT a new record.
+        // NOTE: This will insert with 'schedule_id' as NULL.
+        const { error: insertError } = await db.from('attendance')
+            .insert({
+                student_id: studentId,
+                date: selectedDate,
+                status: newStatus,
+                marked_at: new Date().toISOString()
+            });
+        error = insertError;
+    }
 
     if (error) {
+        console.error('Update failed:', error);
         showNotification(`Failed to update status: ${error.message}`, 'error');
     } else {
         showNotification('Attendance updated successfully!', 'success');
-        loadAttendanceData(); // Refresh the table
+        loadAttendanceData(); // Refresh the table to show the new status and get the new ID
     }
 }
 
@@ -393,7 +385,6 @@ async function loadAttendanceData() {
     const holidayNotice = document.getElementById('attendance-holiday-notice');
     const noData = document.getElementById('no-attendance-data');
 
-    // Reset UI
     tbody.innerHTML = '';
     noData.classList.add('hidden');
     tableContainer.classList.remove('hidden');
@@ -402,7 +393,6 @@ async function loadAttendanceData() {
     document.getElementById('attendance-late-count').textContent = '--';
     document.getElementById('attendance-absent-count').textContent = '--';
 
-    // Check for holiday (college-specific)
     const { data: holiday } = await db.from('holidays').select('id').eq('college_id', collegeId).eq('holiday_date', selectedDate).maybeSingle();
     if (holiday) {
         tableContainer.classList.add('hidden');
@@ -413,12 +403,10 @@ async function loadAttendanceData() {
     let studentIdsToFetch = [];
 
     if (groupId) {
-        // Fetch students from a specific group
         const { data: members, error } = await db.from('student_group_members').select('student_id').eq('group_id', groupId);
         if (error || !members) { noData.classList.remove('hidden'); return; }
         studentIdsToFetch = members.map(m => m.student_id);
     } else if (courseId) {
-        // Fetch students from ALL groups associated with schedules for this course
         const { data: schedules, error } = await db.from('schedules')
             .select('schedule_groups(student_groups(student_group_members(student_id)))')
             .eq('course_id', courseId);
@@ -435,7 +423,6 @@ async function loadAttendanceData() {
         });
         studentIdsToFetch = Array.from(idSet);
     } else {
-        // No course or group, fetch all students in the college
         const { data: allStudents, error } = await db.from('students').select('id').eq('college_id', collegeId);
         if (error || !allStudents) { noData.classList.remove('hidden'); return; }
         studentIdsToFetch = allStudents.map(s => s.id);
@@ -453,13 +440,11 @@ async function loadAttendanceData() {
 
     if (studentsError || !students || students.length === 0) {
         noData.classList.remove('hidden');
-        if (studentsError) console.error(studentsError);
         return;
     }
 
-    // Get attendance records for these students on the selected date
     const { data: attendanceData, error: attendanceError } = await db.from('attendance')
-        .select('id, student_id, status, marked_at, image_proof_url') // *** MODIFIED: Select new columns ***
+        .select('id, student_id, status, marked_at, image_proof_url')
         .in('student_id', studentIdsToFetch)
         .eq('date', selectedDate);
         
@@ -467,9 +452,9 @@ async function loadAttendanceData() {
         console.error(attendanceError);
         return;
     }
+    // We map student_id to the record. If duplicates exist (multiple schedules), this shows the LAST one fetched.
     const attendanceMap = new Map(attendanceData.map(record => [record.student_id, record]));
 
-    // Calculate stats and render table
     let presentCount = 0;
     let lateCount = 0;
     let absentCount = 0;
@@ -477,27 +462,27 @@ async function loadAttendanceData() {
     tbody.innerHTML = students.map(student => {
         const record = attendanceMap.get(student.id);
         const status = record ? record.status : 'absent';
+        // ** NEW: Capture the record ID to pass to the update function **
+        const recordId = record ? record.id : null; 
+        
         const time = record && record.marked_at ? new Date(record.marked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit'}) : '---';
         
         if (status === 'present') presentCount++;
         else if (status === 'late') lateCount++;
         else absentCount++;
 
-        // *** NEW: Create the "View Proof" button ***
         let proofButton = '<span class="text-gray-400">N/A</span>';
         if (record && record.image_proof_url) {
             try {
                 const imageUrls = JSON.parse(record.image_proof_url);
                 if (Array.isArray(imageUrls) && imageUrls.length > 0) {
-                    // Pass the raw JSON string to the onclick function
                     proofButton = `<button onclick='showProofImages(event, \`${record.image_proof_url}\`)' class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200">View (${imageUrls.length})</button>`;
                 }
             } catch (e) {
-                // Not valid JSON, do nothing
             }
         }
-        // *** END OF NEW LOGIC ***
 
+        // ** UPDATED: Pass recordId to manualSetStatus **
         return `
             <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                 <td class="py-3 px-4">
@@ -511,16 +496,15 @@ async function loadAttendanceData() {
                 <td class="py-3 px-4 text-gray-500">${time}</td>
                 <td class="py-3 px-4">${proofButton}</td> <td class="py-3 px-4">
                     <div class="flex space-x-2">
-                        <button onclick="manualSetStatus('${student.id}', 'present')" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'present' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-700'}">Present</button>
-                        <button onclick="manualSetStatus('${student.id}', 'late')" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'late' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-700'}">Late</button>
-                        <button onclick="manualSetStatus('${student.id}', 'absent')" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'absent' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-red-100 hover:text-red-700'}">Absent</button>
+                        <button onclick="manualSetStatus('${student.id}', 'present', '${recordId}')" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'present' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-700'}">Present</button>
+                        <button onclick="manualSetStatus('${student.id}', 'late', '${recordId}')" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'late' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-700'}">Late</button>
+                        <button onclick="manualSetStatus('${student.id}', 'absent', '${recordId}')" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'absent' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-red-100 hover:text-red-700'}">Absent</button>
                     </div>
                 </td>
             </tr>
         `;
     }).join('');
     
-    // Update stat displays
     document.getElementById('attendance-present-count').textContent = presentCount;
     document.getElementById('attendance-late-count').textContent = lateCount;
     document.getElementById('attendance-absent-count').textContent = absentCount;
@@ -530,7 +514,7 @@ async function loadAttendanceData() {
 // NEW: IMAGE PROOF MODAL FUNCTIONS
 // ====================================================
 async function showProofImages(event, urlJsonString) {
-    if (event) event.stopPropagation(); // Prevent row click
+    if (event) event.stopPropagation(); 
     
     const modal = document.getElementById('image-proof-modal');
     const container = document.getElementById('image-proof-container');
@@ -546,29 +530,23 @@ async function showProofImages(event, urlJsonString) {
             return;
         }
 
-        // The stored value might be a full URL or just a path.
-        // Let's get the path from the URL if it's a URL.
         const pathList = paths.map(urlOrPath => {
             try {
-                // Try to parse as URL
                 const url = new URL(urlOrPath);
-                // Get path after the bucket name 'attendance_proofs'
                 const path = url.pathname.split('/attendance_proofs/')[1];
                 return path;
             } catch (e) {
-                // It's not a URL, so it's probably already a path
                 return urlOrPath;
             }
         });
 
-        // Generate signed URLs for all paths in parallel
         const signedUrlPromises = pathList.map(path => 
-            db.storage.from('attendance_proofs').createSignedUrl(path, 60) // 60-second expiry
+            db.storage.from('attendance_proofs').createSignedUrl(path, 60) 
         );
         
         const signedUrlResults = await Promise.all(signedUrlPromises);
 
-        container.innerHTML = ''; // Clear "Loading..."
+        container.innerHTML = ''; 
         container.insertAdjacentHTML('afterbegin', `<p class="text-sm text-gray-600 mb-4">${signedUrlResults.length} proof image(s) from this lecture:</p>`);
 
         signedUrlResults.forEach(({ data, error }) => {
@@ -627,12 +605,10 @@ async function loadSettings() {
         const key = setting.setting_key;
         let value = setting.setting_value;
 
-        // Handle new JSONB format
         if (typeof value === 'string') {
             try {
                 value = JSON.parse(value);
             } catch (e) {
-                // It's just a plain string, let it be.
             }
         }
         
@@ -689,7 +665,7 @@ async function handleGeneralSettingsForm(e) {
     const { error } = await db.from('college_settings').upsert({
         college_id: collegeId,
         setting_key: 'late_threshold_time',
-        setting_value: lateTime // No need to stringify, JSONB handles strings
+        setting_value: lateTime 
     }, { onConflict: 'college_id, setting_key' });
 
     if (error) {
@@ -727,7 +703,6 @@ function resetStudentForm() {
   document.getElementById('form-title').textContent = 'Register New Student';
   document.getElementById('submit-btn-text').textContent = 'Register Student';
   document.getElementById('cancel-btn').classList.add('hidden');
-  // Clear multi-select
   const multiSelect = document.getElementById('student-groups');
   Array.from(multiSelect.options).forEach(option => option.selected = false);
   editingStudentId = null;
@@ -753,7 +728,6 @@ async function saveStudent(event) {
     const email = document.getElementById('student-email').value;
     const photoFile = document.getElementById('student-photo').files[0];
     
-    // Get selected group IDs from multi-select
     const selectedGroupOptions = Array.from(document.getElementById('student-groups').selectedOptions);
     const groupIds = selectedGroupOptions.map(option => option.value);
 
@@ -762,13 +736,11 @@ async function saveStudent(event) {
         return;
     }
 
-    // Disable button
     const submitBtn = document.getElementById('submit-btn-text');
     submitBtn.textContent = editingStudentId ? 'Updating...' : 'Registering...';
     submitBtn.disabled = true;
 
     try {
-        // 1. Upload Photo & Get Embedding (if photo provided)
         let photo_url = null;
         let face_embedding = null;
 
@@ -780,7 +752,6 @@ async function saveStudent(event) {
             const { data: { publicUrl } } = db.storage.from('student-photos').getPublicUrl(filePath);
             photo_url = publicUrl;
 
-            // Get embedding
             const formData = new FormData();
             formData.append('image', photoFile);
             const response = await fetch(`${FACE_API_URL}/get_embedding`, { method: 'POST', body: formData });
@@ -793,7 +764,6 @@ async function saveStudent(event) {
             face_embedding = data.embedding ? JSON.stringify(data.embedding) : null;
         }
 
-        // 2. Upsert Student Data
         const studentData = {
             name,
             roll_number: roll,
@@ -807,22 +777,17 @@ async function saveStudent(event) {
         let student_id = editingStudentId;
 
         if (editingStudentId) {
-            // Update existing student
             const { data, error } = await db.from('students').update(studentData).eq('id', editingStudentId).select('id').single();
             if (error) throw error;
         } else {
-            // Insert new student
             const { data, error } = await db.from('students').insert(studentData).select('id').single();
             if (error) throw error;
             student_id = data.id;
         }
 
-        // 3. Sync Student Group Memberships
-        // First, remove all existing memberships for this student
         const { error: deleteError } = await db.from('student_group_members').delete().eq('student_id', student_id);
         if (deleteError) throw new Error(`Failed to clear old groups: ${deleteError.message}`);
 
-        // Second, add the new memberships
         const memberships = groupIds.map(group_id => ({
             student_id: student_id,
             group_id: group_id
@@ -832,8 +797,8 @@ async function saveStudent(event) {
 
         showNotification(editingStudentId ? 'Student updated successfully!' : 'Student registered successfully!');
         resetStudentForm();
-        await loadAllStudents(); // Refresh cache
-        renderStudentsTable(); // Render from cache
+        await loadAllStudents(); 
+        renderStudentsTable(); 
 
     } catch (error) {
         console.error('Error saving student:', error);
@@ -860,7 +825,6 @@ async function editStudent(id) {
   document.getElementById('student-roll').value = student.roll_number;
   document.getElementById('student-email').value = student.email;
 
-  // Pre-select the groups in the multi-select
   const selectedGroupIds = student.student_group_members.map(m => m.group_id);
   const multiSelect = document.getElementById('student-groups');
   Array.from(multiSelect.options).forEach(option => {
@@ -889,8 +853,8 @@ async function deleteStudent(id) {
       showNotification(`Error: ${error.message}`, 'error');
     } else {
       showNotification('Student deleted successfully!');
-      await loadAllStudents(); // Refresh cache
-      renderStudentsTable(); // Render from cache
+      await loadAllStudents(); 
+      renderStudentsTable(); 
     }
   }
 }
@@ -910,22 +874,18 @@ async function loadAllStudents() {
 }
 
 function renderStudentsTable() {
-    // **** THIS IS THE PATCH ****
-    // We get the element first and check if it exists before trying to read its value.
     const searchInput = document.getElementById('student-search');
-    const searchTerm = searchInput ? searchInput.value.toLowerCase() : ''; // This no longer crashes
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : ''; 
 
     const courseFilterInput = document.getElementById('student-course-filter');
     const courseFilter = courseFilterInput ? courseFilterInput.value : '';
 
     const groupFilterInput = document.getElementById('student-group-filter');
     const groupFilter = groupFilterInput ? groupFilterInput.value : '';
-    // **** END OF PATCH ****
 
     const tbody = document.getElementById('students-table-body');
     const noStudents = document.getElementById('no-students');
     
-    // Filter from cache
     let filteredStudents = allStudentsCache;
 
     if (searchTerm) {
@@ -935,9 +895,6 @@ function renderStudentsTable() {
         );
     }
     
-    // We need to implement group/course filtering. This is complex.
-    // For now, let's just render the search-filtered list.
-
     if (filteredStudents.length === 0) {
         tbody.innerHTML = '';
         noStudents.classList.remove('hidden');
@@ -983,7 +940,6 @@ async function addFaculty(event) {
     btn.textContent = 'Adding...';
 
     try {
-        // 1. Create the Auth user for the teacher
         const { data: authData, error: authError } = await db.auth.signUp({
             email: email,
             password: password,
@@ -1006,7 +962,6 @@ async function addFaculty(event) {
             throw new Error("Could not create user account.");
         }
 
-        // 2. Create the teacher's profile
         const { error: profileError } = await db.from('profiles').insert({
             id: userId,
             college_id: collegeId,
@@ -1016,8 +971,6 @@ async function addFaculty(event) {
         });
         
         if (profileError) {
-            // If profile fails, we should try to clean up the auth user
-            // This is hard from client-side. We'll just throw the profile error.
             console.error("Profile creation failed, but auth user may exist:", profileError);
             throw new Error(`Auth user created, but profile failed: ${profileError.message}`);
         }
@@ -1025,7 +978,7 @@ async function addFaculty(event) {
         showNotification('Faculty added successfully! They can log in immediately.', 'success');
         event.target.reset();
         await renderFacultyList();
-        await updateTeacherSelectors(); // Update dropdowns
+        await updateTeacherSelectors(); 
 
     } catch (error) {
         console.error('Error adding faculty:', error);
@@ -1059,29 +1012,11 @@ async function renderFacultyList() {
 
 async function deleteFaculty(id) {
     if (confirm('Are you sure? This will delete the teacher\'s login and profile.')) {
-        // We use rpc to call a db function because RLS might block
-        // a simple delete if the user is not a 'postgres' role.
-        // For this to work, you need to create a function in Supabase SQL Editor:
-        // CREATE OR REPLACE FUNCTION delete_teacher_user(user_id uuid)
-        // RETURNS void
-        // LANGUAGE plpgsql
-        // SECURITY DEFINER -- !! DANGEROUS, but necessary for this
-        // AS $$
-        // BEGIN
-        //   DELETE FROM auth.users WHERE id = user_id;
-        // END;
-        // $$;
-        
-        // Since we can't be sure the user created that, let's just delete the profile
-        // and ask them to delete the auth user manually.
-        
         const { error: profileError } = await db.from('profiles').delete().eq('id', id);
         
         if (profileError) {
             showNotification(`Error: ${profileError.message}`, 'error');
         } else {
-            // Manually delete the auth user (requires SERVICE_ROLE key, only on a server)
-            // This is complex. For now, just delete the profile.
             showNotification('Teacher profile deleted. You must manually delete their login from the Auth > Users panel.', 'success');
             await renderFacultyList();
             await updateTeacherSelectors();
@@ -1142,7 +1077,7 @@ async function addStudentGroup(event) {
         showNotification('Student Group added successfully!');
         event.target.reset();
         await renderStudentGroupsList();
-        await updateStudentGroupSelectors(); // Update all group dropdowns
+        await updateStudentGroupSelectors(); 
     } catch (error) {
         showNotification(error.code === '23505' ? 'Group name already exists.' : `Error: ${error.message}`, 'error');
     }
@@ -1191,7 +1126,6 @@ async function addSchedule(event) {
     }
 
     try {
-        // 1. Insert the schedule
         const { data: scheduleData, error: scheduleError } = await db.from('schedules').insert({
             college_id: collegeId,
             course_id,
@@ -1203,7 +1137,6 @@ async function addSchedule(event) {
 
         if (scheduleError) throw scheduleError;
 
-        // 2. Link the groups
         const scheduleGroups = groupIds.map(group_id => ({
             schedule_id: scheduleData.id,
             group_id: group_id
@@ -1320,7 +1253,6 @@ async function updateTeacherSelectors() {
     });
 }
 
-// Specific filter logic
 async function updateAttendanceGroupOptions(courseId) {
     const groupSelect = document.getElementById('attendance-group');
     if (!groupSelect) return;
@@ -1328,16 +1260,12 @@ async function updateAttendanceGroupOptions(courseId) {
         groupSelect.innerHTML = '<option value="">All Groups</option>';
         return;
     }
-    // This is complex. We need to find groups that are part of schedules for this course.
-    // For now, let's just show all groups in the college.
     const { data, error } = await db.from('student_groups').select('*').eq('college_id', collegeId).order('group_name');
     if (error) return;
     groupSelect.innerHTML = '<option value="">All Groups</option>' + data.map(s => `<option value="${s.id}">${s.group_name}</option>`).join('');
 }
 
 async function updateStudentGroupFilter(courseId) {
-    // This is also complex.
-    // For now, let's just show all groups in the college.
     const groupSelect = document.getElementById('student-group-filter');
     if (!groupSelect) return;
     const { data, error } = await db.from('student_groups').select('*').eq('college_id', collegeId).order('group_name');
@@ -1352,14 +1280,9 @@ async function updateStudentGroupFilter(courseId) {
 // ====================================================
 // ====================================================
 
-/**
- * Fetches all student groups for the current college and returns a map.
- * @returns {Map<string, string>} A map where key is "group_name" and value is "group_id".
- */
 async function getStudentGroupMap() {
     const groupMap = new Map();
 
-    // 1. Fetch all student groups for the college
     const { data: groups, error: groupError } = await db
         .from('student_groups')
         .select('id, group_name')
@@ -1368,10 +1291,9 @@ async function getStudentGroupMap() {
     if (groupError) throw new Error(`Failed to fetch student groups: ${groupError.message}`);
 
     if (!groups || groups.length === 0) {
-        return groupMap; // No groups, return empty map
+        return groupMap; 
     }
 
-    // 2. Create the lookup map
     groups.forEach(group => {
         groupMap.set(group.group_name, group.id);
     });
@@ -1379,9 +1301,6 @@ async function getStudentGroupMap() {
     return groupMap;
 }
 
-/**
- * Handles the Excel file upload, parsing, and invocation of the bulk-add-students function.
- */
 async function handleExcelUpload() {
     const fileInput = document.getElementById('student-excel-file');
     const statusDiv = document.getElementById('upload-status');
@@ -1399,14 +1318,12 @@ async function handleExcelUpload() {
     processBtn.textContent = 'Processing...';
 
     try {
-        // 1. Get the Student Group mapping
         statusDiv.textContent = 'Fetching student group data...';
         const groupMap = await getStudentGroupMap();
         if (groupMap.size === 0) {
             throw new Error("No Student Groups are set up. Please add groups in the 'Academics' tab before uploading.");
         }
 
-        // 2. Read and Parse the Excel file
         statusDiv.textContent = 'Parsing Excel file...';
         const reader = new FileReader();
         reader.onload = async (e) => {
@@ -1424,7 +1341,6 @@ async function handleExcelUpload() {
                     throw new Error("Excel file is empty or in the wrong format.");
                 }
 
-                // 3. Validate and map data
                 statusDiv.textContent = `Found ${json.length} records. Validating...`;
 
                 for (const [index, row] of json.entries()) {
@@ -1447,7 +1363,7 @@ async function handleExcelUpload() {
                         email: row.Email ? String(row.Email) : null,
                         image_url: String(row.Image_URL),
                         group_id: group_id,
-                        college_id: collegeId, // Global collegeId
+                        college_id: collegeId, 
                     });
                 }
 
@@ -1455,7 +1371,6 @@ async function handleExcelUpload() {
                     throw new Error(`Validation failed:\n- ${validationErrors.join('\n- ')}`);
                 }
 
-                // 4. Invoke the Edge Function *one by one*
                 statusDiv.textContent = `Validation complete. Uploading ${studentsPayload.length} students...`;
                 
                 let processedCount = 0;
@@ -1466,27 +1381,22 @@ async function handleExcelUpload() {
                     statusDiv.textContent = `Uploading ${processedCount + errorCount + 1} of ${studentsPayload.length}: ${student.name}...`;
                     
                     try {
-                        // ** ================== MODIFIED PART ================== **
-                        // We now send the student object wrapped in a "student" key
                         const { data: result, error: funcError } = await db.functions.invoke('bulk-add-students', {
-                            body: { student: student } // Wrap it here
+                            body: { student: student } 
                         });
-                        // ** =================================================== **
 
                         if (funcError) {
-                            throw funcError; // Throw the FunctionsHttpError
+                            throw funcError; 
                         }
 
-                        // If we are here, it's a success
                         processedCount++;
 
                     } catch (error) {
-                        // This will catch the FunctionsHttpError
                         errorCount++;
                         
                         let specificErrorMessage = "Edge Function returned a non-2xx status code";
                         
-                        console.error(`Raw error object for ${student.name}:`, error); // Log the whole error
+                        console.error(`Raw error object for ${student.name}:`, error); 
 
                         if (error.context && error.context.error) {
                             specificErrorMessage = error.context.error;
@@ -1508,7 +1418,6 @@ async function handleExcelUpload() {
                     }
                 }
 
-                // 5. Show final results
                 const finalMessage = `Process complete. Added ${processedCount} students. Failed ${errorCount} students.`;
                 statusDiv.textContent = finalMessage;
                 statusDiv.className = `mt-4 text-sm ${errorCount > 0 ? 'text-red-700' : 'text-green-700'}`;
@@ -1519,7 +1428,7 @@ async function handleExcelUpload() {
                     statusDiv.innerHTML += `<br><strong class="text-red-600">Some students failed:</strong><ul class="list-disc pl-5"><li>${errors.join('</li><li>')}</li></ul>`;
                 }
 
-                await loadAllStudents(); // Refresh the student list
+                await loadAllStudents(); 
                 renderStudentsTable();
 
             } catch (innerError) {
@@ -1530,7 +1439,7 @@ async function handleExcelUpload() {
             } finally {
                 processBtn.disabled = false;
                 processBtn.textContent = 'Upload & Process';
-                fileInput.value = ''; // Clear the file input
+                fileInput.value = ''; 
             }
         };
 
