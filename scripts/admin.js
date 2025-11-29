@@ -107,7 +107,6 @@ async function initializePage() {
         studentCourseFilterEl.addEventListener('change', (e) => updateStudentGroupFilter(e.target.value));
     }
     
-    // *** FIX FOR FILTER BY GROUP ***
     const studentGroupFilterEl = document.getElementById('student-group-filter');
     if (studentGroupFilterEl) {
         studentGroupFilterEl.addEventListener('change', renderStudentsTable);
@@ -339,8 +338,6 @@ function getAttendanceStatusBadge(status) {
     return badges[status] || badges['absent'];
 }
 
-// *** FIXED: Manual Set Status Function ***
-// Handles the "null schedule_id" error by looking up the schedule if needed.
 window.manualSetStatus = async function(studentId, newStatus, recordId = null) {
     const selectedDate = document.getElementById('attendance-date-picker').value;
     const courseId = document.getElementById('attendance-course').value; 
@@ -1094,7 +1091,26 @@ async function renderCoursesList() {
 }
 
 async function deleteCourse(id) {
-    if (confirm('Are you sure? This will delete all schedules associated with this course.')) {
+    if (confirm('Are you sure? This will delete all schedules and attendance records associated with this course.')) {
+        // 1. Get all schedules for this course
+        const { data: schedules } = await db.from('schedules').select('id').eq('course_id', id);
+        const scheduleIds = schedules.map(s => s.id);
+
+        if (scheduleIds.length > 0) {
+            // 2. Delete attendance for these schedules
+            const { error: attError } = await db.from('attendance').delete().in('schedule_id', scheduleIds);
+            if (attError) { showNotification(`Error cleaning attendance: ${attError.message}`, 'error'); return; }
+
+            // 3. Delete schedule_groups links
+            const { error: sgError } = await db.from('schedule_groups').delete().in('schedule_id', scheduleIds);
+            if (sgError) { showNotification(`Error cleaning groups: ${sgError.message}`, 'error'); return; }
+
+            // 4. Delete the schedules
+            const { error: sError } = await db.from('schedules').delete().in('id', scheduleIds);
+            if (sError) { showNotification(`Error cleaning schedules: ${sError.message}`, 'error'); return; }
+        }
+
+        // 5. Finally delete the course
         const { error } = await db.from('courses').delete().eq('id', id);
         if (error) {
             showNotification(`Error: ${error.message}`, 'error');
@@ -1136,6 +1152,13 @@ async function renderStudentGroupsList() {
 
 async function deleteStudentGroup(id) {
     if (confirm('Are you sure? This will remove all students from this group.')) {
+        // Clean up linked tables first to avoid FK constraints
+        const { error: sgError } = await db.from('schedule_groups').delete().eq('group_id', id);
+        if (sgError) { showNotification(`Error cleaning schedule links: ${sgError.message}`, 'error'); return; }
+        
+        const { error: memError } = await db.from('student_group_members').delete().eq('group_id', id);
+        if (memError) { showNotification(`Error cleaning student members: ${memError.message}`, 'error'); return; }
+
         const { error } = await db.from('student_groups').delete().eq('id', id);
         if (error) {
             showNotification(`Error: ${error.message}`, 'error');
@@ -1229,7 +1252,22 @@ async function renderSchedulesList() {
 }
 
 async function deleteSchedule(id) {
-    if (confirm('Are you sure you want to delete this schedule?')) {
+    if (confirm('Are you sure you want to delete this schedule? WARNING: This will delete all associated attendance records.')) {
+        // 1. Delete linked attendance records first
+        const { error: attError } = await db.from('attendance').delete().eq('schedule_id', id);
+        if (attError) {
+             showNotification(`Error deleting attendance data: ${attError.message}`, 'error');
+             return;
+        }
+
+        // 2. Delete linked groups (schedule_groups)
+        const { error: groupError } = await db.from('schedule_groups').delete().eq('schedule_id', id);
+        if (groupError) {
+             showNotification(`Error deleting schedule links: ${groupError.message}`, 'error');
+             return;
+        }
+
+        // 3. Now delete the schedule
         const { error } = await db.from('schedules').delete().eq('id', id);
         if (error) {
             showNotification(`Error: ${error.message}`, 'error');
