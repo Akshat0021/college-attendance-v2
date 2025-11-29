@@ -11,8 +11,8 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // Global variables
 let classAttendanceChart = null;
 let editingStudentId = null;
-let collegeId = null; // Changed from schoolId
-let collegeName = null; // To display
+let collegeId = null;
+let collegeName = null;
 let allStudentsCache = []; // Cache for student data
 
 
@@ -68,12 +68,13 @@ async function initializePage() {
         datePicker.value = new Date().toISOString().split('T')[0];
     }
     
+    // Helper to safely add listeners
     const addListener = (id, event, handler) => {
         const element = document.getElementById(id);
         if (element) {
             element.addEventListener(event, handler);
         } else {
-            console.error(`FATAL: Element with ID '${id}' was not found. Your HTML file might be old.`);
+            console.error(`Warning: Element with ID '${id}' not found.`);
         }
     };
 
@@ -95,10 +96,8 @@ async function initializePage() {
     if (attendanceClassEl) {
         attendanceClassEl.addEventListener('change', async (e) => {
             await updateAttendanceGroupOptions(e.target.value);
-            loadAttendanceData(); // Load data for "All Groups" by default
+            loadAttendanceData(); 
         });
-    } else {
-        console.error("FATAL: Element with ID 'attendance-course' was not found.");
     }
     
     addListener('attendance-group', 'change', loadAttendanceData);
@@ -106,8 +105,12 @@ async function initializePage() {
     const studentCourseFilterEl = document.getElementById('student-course-filter');
     if (studentCourseFilterEl) {
         studentCourseFilterEl.addEventListener('change', (e) => updateStudentGroupFilter(e.target.value));
-    } else {
-        console.error("FATAL: Element with ID 'student-course-filter' was not found.");
+    }
+    
+    // *** FIX FOR FILTER BY GROUP ***
+    const studentGroupFilterEl = document.getElementById('student-group-filter');
+    if (studentGroupFilterEl) {
+        studentGroupFilterEl.addEventListener('change', renderStudentsTable);
     }
 
     addListener('proof-modal-close', 'click', closeProofModal);
@@ -141,7 +144,6 @@ function toggleEmailControls() {
     const controlsContainer = document.getElementById('email-controls-container');
     
     if (!controlsContainer) {
-        console.error("FATAL: Element 'email-controls-container' not found.");
         return;
     }
 
@@ -337,15 +339,23 @@ function getAttendanceStatusBadge(status) {
     return badges[status] || badges['absent'];
 }
 
-// ** UPDATED FUNCTION: Now accepts recordId **
-async function manualSetStatus(studentId, newStatus, recordId = null) {
+// *** FIXED: Manual Set Status Function ***
+// Handles the "null schedule_id" error by looking up the schedule if needed.
+window.manualSetStatus = async function(studentId, newStatus, recordId = null) {
     const selectedDate = document.getElementById('attendance-date-picker').value;
-    
+    const courseId = document.getElementById('attendance-course').value; 
+
+    // Validation: If we are creating a NEW record (recordId is null), we MUST have a course selected
+    // so we can look up the correct schedule_id.
+    if (!recordId && !courseId) {
+        showNotification("Please select a specific Course from the dropdown to mark new attendance.", "error");
+        return;
+    }
+
     let error;
 
-    // Check if we are updating an existing record (by ID) or creating a new one
-    if (recordId && recordId !== 'null' && recordId !== 'undefined') {
-        // We have a specific record ID, so we UPDATE it. This is safe and avoids conflict errors.
+    if (recordId) {
+        // UPDATE existing record: No need for schedule_id, we just update status
         const { error: updateError } = await db.from('attendance')
             .update({
                 status: newStatus,
@@ -354,25 +364,47 @@ async function manualSetStatus(studentId, newStatus, recordId = null) {
             .eq('id', recordId);
         error = updateError;
     } else {
-        // No record exists for this student on this day (or at least none we saw).
-        // We INSERT a new record.
-        // NOTE: This will insert with 'schedule_id' as NULL.
+        // INSERT new record: We need to find the schedule_id
+        const dateObj = new Date(selectedDate);
+        const dayOfWeek = dateObj.getDay(); // 0 (Sun) to 6 (Sat)
+
+        // Find the schedule for this course on this day
+        const { data: schedules, error: schedError } = await db.from('schedules')
+            .select('id')
+            .eq('course_id', courseId)
+            .eq('day_of_week', dayOfWeek)
+            .limit(1);
+
+        if (schedError) {
+             console.error("Schedule fetch error:", schedError);
+             showNotification("Error verifying schedule.", "error");
+             return;
+        }
+
+        if (!schedules || schedules.length === 0) {
+             showNotification("No class schedule found for this Course on the selected Date.", "error");
+             return;
+        }
+
+        const scheduleId = schedules[0].id;
+
         const { error: insertError } = await db.from('attendance')
             .insert({
                 student_id: studentId,
                 date: selectedDate,
                 status: newStatus,
-                marked_at: new Date().toISOString()
+                marked_at: new Date().toISOString(),
+                schedule_id: scheduleId
             });
         error = insertError;
     }
 
     if (error) {
         console.error('Update failed:', error);
-        showNotification(`Failed to update status: ${error.message}`, 'error');
+        showNotification(`Failed: ${error.message}`, 'error');
     } else {
         showNotification('Attendance updated successfully!', 'success');
-        loadAttendanceData(); // Refresh the table to show the new status and get the new ID
+        loadAttendanceData(); 
     }
 }
 
@@ -452,7 +484,8 @@ async function loadAttendanceData() {
         console.error(attendanceError);
         return;
     }
-    // We map student_id to the record. If duplicates exist (multiple schedules), this shows the LAST one fetched.
+    
+    // Map student_id to the record
     const attendanceMap = new Map(attendanceData.map(record => [record.student_id, record]));
 
     let presentCount = 0;
@@ -462,8 +495,9 @@ async function loadAttendanceData() {
     tbody.innerHTML = students.map(student => {
         const record = attendanceMap.get(student.id);
         const status = record ? record.status : 'absent';
-        // ** NEW: Capture the record ID to pass to the update function **
-        const recordId = record ? record.id : null; 
+        
+        // Ensure recordId is passed as null (value) if undefined
+        const recordIdArg = record ? `'${record.id}'` : 'null';
         
         const time = record && record.marked_at ? new Date(record.marked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit'}) : '---';
         
@@ -482,7 +516,6 @@ async function loadAttendanceData() {
             }
         }
 
-        // ** UPDATED: Pass recordId to manualSetStatus **
         return `
             <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                 <td class="py-3 px-4">
@@ -496,9 +529,9 @@ async function loadAttendanceData() {
                 <td class="py-3 px-4 text-gray-500">${time}</td>
                 <td class="py-3 px-4">${proofButton}</td> <td class="py-3 px-4">
                     <div class="flex space-x-2">
-                        <button onclick="manualSetStatus('${student.id}', 'present', '${recordId}')" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'present' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-700'}">Present</button>
-                        <button onclick="manualSetStatus('${student.id}', 'late', '${recordId}')" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'late' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-700'}">Late</button>
-                        <button onclick="manualSetStatus('${student.id}', 'absent', '${recordId}')" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'absent' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-red-100 hover:text-red-700'}">Absent</button>
+                        <button onclick="manualSetStatus('${student.id}', 'present', ${recordIdArg})" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'present' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-green-100 hover:text-green-700'}">Present</button>
+                        <button onclick="manualSetStatus('${student.id}', 'late', ${recordIdArg})" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'late' ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-700'}">Late</button>
+                        <button onclick="manualSetStatus('${student.id}', 'absent', ${recordIdArg})" class="px-3 py-1 rounded-lg text-sm font-medium transition-all ${status === 'absent' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-red-100 hover:text-red-700'}">Absent</button>
                     </div>
                 </td>
             </tr>
@@ -877,9 +910,6 @@ function renderStudentsTable() {
     const searchInput = document.getElementById('student-search');
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : ''; 
 
-    const courseFilterInput = document.getElementById('student-course-filter');
-    const courseFilter = courseFilterInput ? courseFilterInput.value : '';
-
     const groupFilterInput = document.getElementById('student-group-filter');
     const groupFilter = groupFilterInput ? groupFilterInput.value : '';
 
@@ -888,10 +918,19 @@ function renderStudentsTable() {
     
     let filteredStudents = allStudentsCache;
 
+    // Filter by search term
     if (searchTerm) {
         filteredStudents = filteredStudents.filter(s => 
             s.name.toLowerCase().includes(searchTerm) ||
             (s.roll_number && s.roll_number.toLowerCase().includes(searchTerm))
+        );
+    }
+
+    // ** FIX: Filter by group **
+    if (groupFilter) {
+        filteredStudents = filteredStudents.filter(s => 
+            s.student_group_members && 
+            s.student_group_members.some(m => m.student_groups && m.student_groups.id === groupFilter)
         );
     }
     
@@ -904,7 +943,7 @@ function renderStudentsTable() {
     
     noStudents.classList.add('hidden');
     tbody.innerHTML = filteredStudents.map(student => {
-        const groups = student.student_group_members.map(m => m.student_groups.group_name).join(', ');
+        const groups = student.student_group_members.map(m => m.student_groups ? m.student_groups.group_name : 'N/A').join(', ');
         return `
             <tr class="border-b border-gray-50 hover:bg-blue-50/50">
               <td class="py-4 px-4">${student.photo_url ? `<img src="${student.photo_url}" class="w-12 h-12 rounded-full object-cover">` : `<div class="w-12 h-12 photo-placeholder rounded-full flex items-center justify-center"><span class="text-white font-bold text-sm">${getInitials(student.name)}</span></div>`}</td>
@@ -1270,7 +1309,7 @@ async function updateStudentGroupFilter(courseId) {
     if (!groupSelect) return;
     const { data, error } = await db.from('student_groups').select('*').eq('college_id', collegeId).order('group_name');
     if (error) return;
-    groupSelect.innerHTML = '<option value="">All Groups</section>' + data.map(s => `<option value="${s.id}">${s.group_name}</option>`).join('');
+    groupSelect.innerHTML = '<option value="">All Groups</option>' + data.map(s => `<option value="${s.id}">${s.group_name}</option>`).join('');
 }
 
 
